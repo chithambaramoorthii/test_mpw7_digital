@@ -75,34 +75,74 @@ module user_proj_example #(
     wire [`MPRJ_IO_PADS-1:0] io_out;
     wire [`MPRJ_IO_PADS-1:0] io_oeb;
 
-    wire [31:0] rdata; 
-    wire [31:0] wdata;
-    wire [BITS-1:0] count;
+    wire [15:0] WL;
+    wire [15:0] BL;
+    wire [15:0] SL;
+    wire VSS;
 
-    wire valid;
-    wire [3:0] wstrb;
-    wire [31:0] la_write;
+    wire V1;
+    wire V2;
+    wire V3;
+    wire V4;
+    wire V5;
+    wire V6;
+    wire V7;
+    wire V8;
+    wire S1_MUX;
+    wire S0_MUX;
+    wire VDD_HIGH;
+    wire VDD_LOW;
+    wire S2_MUX;
+    wire OUT;
 
-    // WB MI A
-    assign valid = wbs_cyc_i && wbs_stb_i; 
-    assign wstrb = wbs_sel_i & {4{wbs_we_i}};
-    assign wbs_dat_o = rdata;
-    assign wdata = wbs_dat_i;
+   wire [31:0] rdata; 
+   wire [31:0] wdata;
+   wire [BITS-1:0] count;
 
-    // IO
-    assign io_out = count;
-    assign io_oeb = {(`MPRJ_IO_PADS-1){rst}};
+   wire valid;
+   wire [3:0] wstrb;
+   wire [31:0] la_write;
+
+    //WB MI A
+   assign valid = wbs_cyc_i && wbs_stb_i; 
+   assign wstrb = wbs_sel_i & {4{wbs_we_i}};
+   assign wbs_dat_o = rdata;
+   assign wdata = wbs_dat_i;
+
+   // IO
+   assign io_out = count;
+   assign io_oeb = {(`MPRJ_IO_PADS-1){rst}};
 
     // IRQ
     assign irq = 3'b000;	// Unused
 
+ assign WL = la_data_in[15:0];
+ assign BL = la_data_in[31:16];
+ assign la_data_out[47:32] = SL;
+
+ assign VSS = vssd1;
+    assign clk = wb_clk_i;
+    assign rst = wb_rst_i;
+    
+
     // LA
-    assign la_data_out = {{(127-BITS){1'b0}}, count};
+    //assign la_data_out = {{(127-BITS){1'b0}}, count};
     // Assuming LA probes [63:32] are for controlling the count register  
     assign la_write = ~la_oenb[63:32] & ~{BITS{valid}};
     // Assuming LA probes [65:64] are for controlling the count clk & reset  
     assign clk = (~la_oenb[64]) ? la_data_in[64]: wb_clk_i;
     assign rst = (~la_oenb[65]) ? la_data_in[65]: wb_rst_i;
+
+    (* blackbox *)
+    rram_wrapper_16x16 UUT(
+        .clk0(clk),
+        .VSS(vssd1),
+        .WL(WL),
+        .BL(BL),
+        .SL(SL)
+        );
+
+
 
     counter #(
         .BITS(BITS)
@@ -117,9 +157,27 @@ module user_proj_example #(
         .la_write(la_write),
         .la_input(la_data_in[63:32]),
         .count(count)
-    );
+    ); 
+
 
 endmodule
+
+
+module rram_wrapper_16x16 (WL , SL , BL , VSS , clk0);
+
+input [15:0]WL;
+input [15:0]BL;
+output [15:0]SL;
+
+input VSS , clk0;
+
+T1R_16x16_DUMMY U_1T1R_16x16_DUMMY (.WL(WL) , .SL(SL) , .BL(BL) , .VSS(VSS));
+
+
+endmodule
+
+
+
 
 module counter #(
     parameter BITS = 32
@@ -162,4 +220,5 @@ module counter #(
     end
 
 endmodule
+
 `default_nettype wire
